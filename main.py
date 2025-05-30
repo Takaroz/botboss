@@ -167,11 +167,12 @@ async def killat(interaction: discord.Interaction, boss_name: str, killed_time: 
 
     if(today_killed > now):
         killed_datetime = today_killed - timedelta(days=1)
+        print(killed_datetime)
     else:
         killed_datetime = today_killed
     
-    if (now - killed_datetime).total_seconds() > 3600:
-        killed_datetime += timedelta(days=1)
+    #if (now - killed_datetime).total_seconds() > 3600:
+    #    killed_datetime += timedelta(days=1)
     next_spawn = killed_datetime + timedelta(hours=period.hour, minutes=period.minute)
     spawn_str = next_spawn.strftime("%Y-%m-%d %H:%M")
     async with aiosqlite.connect(DB_PATH) as db:
