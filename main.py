@@ -154,37 +154,30 @@ async def killat(interaction: discord.Interaction, boss_name: str, killed_time: 
     except ValueError:
         await interaction.response.send_message("❌ เวลาที่ระบุไม่ถูกต้อง ต้องอยู่ในรูปแบบ HH:MM", ephemeral=True)
         return
-
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute("SELECT no, period FROM bosses WHERE name = ?", (boss_name,))
         row = await cursor.fetchone()
-
     if not row:
         await interaction.response.send_message("❌ ไม่พบบอสชื่อนี้", ephemeral=True)
         return
-
     no, period_str = row
     period = datetime.strptime(period_str, "%H:%M")
+    now = datetime.now(ZoneInfo("Asia/Bangkok"))
+    today_killed = datetime.combine(now.date(), killed_time_obj).replace(tzinfo=ZoneInfo("Asia/Bangkok"))
 
-    now = datetime.now(timezone(timedelta(hours=7)))  # ใช้เวลา UTC+7
-    today_killed = datetime.combine(now.date(), killed_time_obj, tzinfo=now.tzinfo)
-
-    # ❗ ปรับให้ย้อนกลับเป็นเมื่อวานถ้าเวลานั้นยังไม่ถึงในวันนี้
-    if today_killed > now:
+    if(today_killed > now):
         killed_datetime = today_killed - timedelta(days=1)
     else:
         killed_datetime = today_killed
-
+    
+    if (now - killed_datetime).total_seconds() > 3600:
+        killed_datetime += timedelta(days=1)
     next_spawn = killed_datetime + timedelta(hours=period.hour, minutes=period.minute)
     spawn_str = next_spawn.strftime("%Y-%m-%d %H:%M")
-
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("UPDATE bosses SET next_spawn = ? WHERE no = ?", (spawn_str, no))
         await db.commit()
-
-    await interaction.response.send_message(
-        f"✅ ตั้งเวลาฟื้นครั้งถัดไปของบอส {boss_name} เป็น {spawn_str}"
-    )
+    await interaction.response.send_message(f"✅ ตั้งเวลาฟื้นครั้งถัดไปของบอส {boss_name} เป็น {spawn_str} (เวลาไทย)")
 
 
 
