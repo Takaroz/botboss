@@ -44,6 +44,31 @@ async def init_db():
                 locate TEXT DEFAULT '-'
             )
         """)
+        await db.executemany("""
+            INSERT INTO bosses (name, period, locate) VALUES (?, ?, ?)
+        """, [
+            ("เชอร์ทูบา", "06:00", NULL),
+            ("เคลซอส", "10:00", NULL),
+            ("บาซิลา", "04:00", NULL),
+            ("เฟลิส", "03:00", NULL),
+            ("ทาลาคิน", "10:00", NULL),
+            ("พันดรายด์", "12:00", NULL),
+            ("ซาร์ก้า", "10:00", NULL),
+            ("ทิมิทริส", "08:00", NULL),
+            ("สตัน", "07:00", NULL),
+            ("ครูม่ากลายพัน", "08:00", NULL),
+            ("พันนาโรด", "10:00", NULL),
+            ("เมดูซ่า", "10:00", NULL),
+            ("เบรก้า", "06:00", NULL),
+            ("มาทูรา", "06:00", NULL),
+            ("แบล็คลิลลี่", "12:00", NULL),
+            ("เบฮีมอธ", "09:00", NULL),
+            ("ซาบัน", "12:00", "มดชั้น2"),
+            ("ราชินีมด", "06:00", "มดชั้น3"),
+            ("ครูม่าปนเปื้อน", "08:00", "ครูม่าชั้น 3"),
+            ("คาทาน", "10:00", "ครูม่าชั้น 6"),
+            ("คอร์ซัส", "10:00", "ครูม่าชั้น 7"),
+        ])
         await db.commit()
 
 # ---------- ADD BOSS ----------
@@ -149,7 +174,7 @@ async def killat(interaction: discord.Interaction, boss_name: str, killed_time: 
     await interaction.response.send_message(f"✅ ตั้งเวลาฟื้นครั้งถัดไปของบอส {boss_name} เป็น {spawn_str} (เวลาไทย)")
 
 # ---------- CHECK NOTIFICATIONS ----------
-@tasks.loop(seconds=60)
+@tasks.loop(seconds=180)
 async def check_spawn_notifications():
     await bot.wait_until_ready()
     channel = bot.get_channel(CHANNEL_ID)
