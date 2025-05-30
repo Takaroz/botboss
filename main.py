@@ -73,7 +73,7 @@ async def listboss(interaction: discord.Interaction):
     message += f"{'No.':<4} {'ชื่อ':<15} {'ช่วงเวลา':<8} {'เกิดอีกครั้ง':<16}"
     message += "-" * 50 + ""
     for no, name, period, next_spawn in rows:
-        message += f"{no:<4} {name:<15} {period:<8} {next_spawn:<16}"
+        message += f"\n{no:<4} {name:<15} {period:<8} {next_spawn:<16}"
     message += "```"
     await interaction.response.send_message(message)
 
