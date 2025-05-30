@@ -64,18 +64,15 @@ async def addboss(interaction: discord.Interaction, name: str, period: str, loca
 @bot.tree.command(name="listboss", description="แสดงรายชื่อบอสทั้งหมด")
 async def listboss(interaction: discord.Interaction):
     async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute("SELECT no, name, period, COALESCE(next_spawn, '-') FROM bosses")
-        rows = await cursor.fetchall()
+        async with db.execute("SELECT no, name, locate, period, next_spawn FROM bosses ORDER BY no ASC") as cursor:
+            rows = await cursor.fetchall()
     if not rows:
-        await interaction.response.send_message("📭 ยังไม่มีข้อมูลบอส")
+        await interaction.response.send_message("⚠️ ยังไม่มีข้อมูลบอสในระบบ")
         return
-    message = "**📋 รายชื่อบอส:**```"
-    message += f"{'No.':<4} {'ชื่อ':<15} {'ช่วงเวลา':<8} {'เกิดอีกครั้ง':<16}"
-    message += "-" * 50 + ""
-    for no, name, period, next_spawn in rows:
-        message += f"\n{no:<4} {name:<15} {period:<8} {next_spawn:<16}"
-    message += "```"
-    await interaction.response.send_message(message)
+    msg = "**📋 รายชื่อบอสทั้งหมด:**\n"
+    for no, name, locate, period, next_spawn in rows:
+        msg += f"NO.{no}\t {name}\t {locate}\t ({period})\t {next_spawn}\n"
+    await interaction.response.send_message(msg)
 
 # ---------- DELETE BOSS ----------
 @bot.tree.command(name="deleteboss", description="ลบบอส")
