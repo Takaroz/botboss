@@ -149,7 +149,7 @@ async def killat(interaction: discord.Interaction, boss_name: str, killed_time: 
         await db.commit()
 
     await interaction.response.send_message(
-        f"✅ ตั้งเวลาฟื้นครั้งถัดไปของบอส {boss_name} เป็น {spawn_str}"
+        f"เวลา {now} ✅ ตั้งเวลาฟื้นครั้งถัดไปของบอส {boss_name} เป็น {spawn_str}"
     )
 
 
