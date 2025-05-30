@@ -1,21 +1,38 @@
-
 import os
 import discord
-from discord.ext import commands
 from discord import app_commands
-import aiosqlite
+from discord.ext import commands, tasks
 import asyncio
-from datetime import datetime, timedelta, time as dtime
+import aiosqlite
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from myServer import server_on
 
+# ---------- CONFIG ----------
+TOKEN = os.getenv('TOKEN')  # <-- ใส่ Token จริงที่นี่
 DB_PATH = "bosses.db"
-CHANNEL_ID = 1377663275650515094  # แก้เป็น channel id ที่จะแจ้งเตือน
+CHANNEL_ID = 1377663275650515094  # <-- เปลี่ยนเป็น channel id ที่จะใช้แจ้งเตือน
 
+# ---------- BOT SETUP ----------
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="/", intents=intents)
 
-# -------- Database Initialization --------
+# ---------- AUTOCOMPLETE ----------
+async def boss_name_autocomplete(interaction: discord.Interaction, current: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute("SELECT name FROM bosses WHERE name LIKE ?", (f"%{current}%",))
+        names = [row[0] for row in await cursor.fetchall()]
+    return [app_commands.Choice(name=name, value=name) for name in names]
+
+# ---------- ON READY ----------
+@bot.event
+async def on_ready():
+    await bot.tree.sync()
+    print(f"✅ Logged in as {bot.user}")
+    check_spawn_notifications.start()
+
+# ---------- CREATE TABLE ----------
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
@@ -23,77 +40,73 @@ async def init_db():
                 no INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 period TEXT NOT NULL,
-                locate TEXT NOT NULL,
-                next_spawn TEXT
-            );
+                next_spawn TEXT,
+                locate TEXT DEFAULT '-'
+            )
         """)
         await db.commit()
 
-# -------- Autocomplete for Boss Name --------
-async def boss_name_autocomplete(interaction: discord.Interaction, current: str):
-    async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute("SELECT name FROM bosses WHERE name LIKE ? LIMIT 25", (f"%{current}%",))
-        rows = await cursor.fetchall()
-    return [app_commands.Choice(name=row[0], value=row[0]) for row in rows]
-
-# -------- Commands --------
-@bot.event
-async def on_ready():
-    await init_db()
-    await bot.tree.sync()
-    print(f"✅ Bot is ready as {bot.user}")
-    bot.loop.create_task(check_spawn_notifications())
-
+# ---------- ADD BOSS ----------
 @bot.tree.command(name="addboss", description="เพิ่มบอสใหม่")
-@app_commands.describe(name="ชื่อบอส", locate="ที่อยู่", period="เวลาเกิดซ้ำ (HH:MM)")
-async def addboss(interaction: discord.Interaction, name: str, locate:str, period: str):
+@app_commands.describe(name="ชื่อบอส", period="ช่วงเวลาเกิดใหม่ (HH:MM)", locate="สถานที่")
+async def addboss(interaction: discord.Interaction, name: str, period: str, locate: str = "-"):
+    try:
+        datetime.strptime(period, "%H:%M")
+    except ValueError:
+        await interaction.response.send_message("❌ รูปแบบเวลาไม่ถูกต้อง (ต้องเป็น HH:MM)", ephemeral=True)
+        return
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("INSERT INTO bosses (name, locate, period) VALUES (?, ?, ?)", (name, locate, period))
+        await db.execute("INSERT INTO bosses (name, period, locate) VALUES (?, ?, ?)", (name, period, locate))
         await db.commit()
-    await interaction.response.send_message(f"✅ เพิ่มบอส '{name}'  อยู่  {locate} พร้อมช่วงเวลา {period}")
+    await interaction.response.send_message(f"✅ เพิ่มบอส {name} แล้ว")
 
+# ---------- LIST BOSSES ----------
 @bot.tree.command(name="listboss", description="แสดงรายชื่อบอสทั้งหมด")
 async def listboss(interaction: discord.Interaction):
     async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("SELECT no, name, locate, period, next_spawn FROM bosses ORDER BY no ASC") as cursor:
-            rows = await cursor.fetchall()
+        cursor = await db.execute("SELECT no, name, period, COALESCE(next_spawn, '-') FROM bosses")
+        rows = await cursor.fetchall()
     if not rows:
-        await interaction.response.send_message("⚠️ ยังไม่มีข้อมูลบอสในระบบ")
+        await interaction.response.send_message("📭 ยังไม่มีข้อมูลบอส")
         return
-    msg = "**📋 รายชื่อบอสทั้งหมด:**\n"
-    for no, name, locate, period, next_spawn in rows:
-        msg += f"NO.{no}\t {name}\t {locate}\t ({period})\t {next_spawn}\n"
-    await interaction.response.send_message(msg)
+    message = "**📋 รายชื่อบอส:**
+```"
+    message += f"{'No.':<4} {'ชื่อ':<15} {'ช่วงเวลา':<8} {'เกิดอีกครั้ง':<16}
+"
+    message += "-" * 50 + "
+"
+    for no, name, period, next_spawn in rows:
+        message += f"{no:<4} {name:<15} {period:<8} {next_spawn:<16}
+"
+    message += "```"
+    await interaction.response.send_message(message)
 
-@bot.tree.command(name="deleteboss", description="ลบบอสตามหมายเลข")
-@app_commands.describe(no="หมายเลขบอส")
-async def deleteboss(interaction: discord.Interaction, no: int):
+# ---------- DELETE BOSS ----------
+@bot.tree.command(name="deleteboss", description="ลบบอส")
+@app_commands.describe(boss_name="ชื่อบอสที่จะลบ")
+@app_commands.autocomplete(boss_name=boss_name_autocomplete)
+async def deleteboss(interaction: discord.Interaction, boss_name: str):
     async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute("SELECT * FROM bosses WHERE no = ?", (no,))
-        row = await cursor.fetchone()
-        if not row:
-            await interaction.response.send_message(f"❌ ไม่พบบอสหมายเลข {no}", ephemeral=True)
-            return
-        await db.execute("DELETE FROM bosses WHERE no = ?", (no,))
+        await db.execute("DELETE FROM bosses WHERE name = ?", (boss_name,))
         await db.commit()
-    await interaction.response.send_message(f"🗑️ ลบบอสหมายเลข {no} เรียบร้อยแล้ว")
+    await interaction.response.send_message(f"🗑️ ลบบอส {boss_name} แล้ว")
 
+# ---------- EDIT BOSS ----------
 @bot.tree.command(name="editboss", description="แก้ไขชื่อและเวลาของบอส")
 @app_commands.describe(no="หมายเลขบอส", name="ชื่อใหม่", period="เวลาใหม่ (HH:MM)")
 async def editboss(interaction: discord.Interaction, no: int, name: str, period: str):
     try:
-        datetime.strptime(period, "%H:%M")  # ตรวจสอบรูปแบบก่อน
+        datetime.strptime(period, "%H:%M")
     except ValueError:
-        await interaction.response.send_message("❌ รูปแบบเวลาไม่ถูกต้อง ต้องเป็น HH:MM", ephemeral=True)
+        await interaction.response.send_message("❌ รูปแบบเวลาไม่ถูกต้อง (ต้องเป็น HH:MM)", ephemeral=True)
         return
-
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("UPDATE bosses SET name = ?, period = ? WHERE no = ?", (name, period, no))
         await db.commit()
     await interaction.response.send_message(f"✏️ แก้ไขบอสหมายเลข {no} เป็น {name} ({period}) เรียบร้อย")
 
-
-@bot.tree.command(name="killnow", description="แจ้งว่าบอสถูกฆ่าตอนนี้")
+# ---------- KILLNOW ----------
+@bot.tree.command(name="killnow", description="แจ้งเวลาที่บอสตายตอนนี้")
 @app_commands.describe(boss_name="ชื่อบอส")
 @app_commands.autocomplete(boss_name=boss_name_autocomplete)
 async def killnow(interaction: discord.Interaction, boss_name: str):
@@ -105,14 +118,15 @@ async def killnow(interaction: discord.Interaction, boss_name: str):
         return
     no, period_str = row
     period = datetime.strptime(period_str, "%H:%M")
-    now = datetime.now()
+    now = datetime.now(ZoneInfo("Asia/Bangkok"))
     next_spawn = now + timedelta(hours=period.hour, minutes=period.minute)
     spawn_str = next_spawn.strftime("%Y-%m-%d %H:%M")
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("UPDATE bosses SET next_spawn = ? WHERE no = ?", (spawn_str, no))
         await db.commit()
-    await interaction.response.send_message(f"✅ บอส {boss_name} จะฟื้นอีกครั้งที่ {spawn_str}")
+    await interaction.response.send_message(f"✅ บอส {boss_name} จะเกิดอีกครั้งที่ {spawn_str} (เวลาไทย)")
 
+# ---------- KILLAT ----------
 @bot.tree.command(name="killat", description="ระบุเวลาที่บอสถูกฆ่า")
 @app_commands.describe(boss_name="ชื่อบอส", killed_time="เวลาที่บอสถูกฆ่า (เช่น 13:45)")
 @app_commands.autocomplete(boss_name=boss_name_autocomplete)
@@ -122,57 +136,52 @@ async def killat(interaction: discord.Interaction, boss_name: str, killed_time: 
     except ValueError:
         await interaction.response.send_message("❌ เวลาที่ระบุไม่ถูกต้อง ต้องอยู่ในรูปแบบ HH:MM", ephemeral=True)
         return
-
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute("SELECT no, period FROM bosses WHERE name = ?", (boss_name,))
         row = await cursor.fetchone()
-
     if not row:
         await interaction.response.send_message("❌ ไม่พบบอสชื่อนี้", ephemeral=True)
         return
-
     no, period_str = row
     period = datetime.strptime(period_str, "%H:%M")
-    now = datetime.now()
-
-    killed_datetime = datetime.combine(now.date(), killed_time_obj)
-
-    # แก้ปัญหาเวลาเกินวันเมื่อไม่ควร
+    now = datetime.now(ZoneInfo("Asia/Bangkok"))
+    killed_datetime = datetime.combine(now.date(), killed_time_obj).replace(tzinfo=ZoneInfo("Asia/Bangkok"))
     if (now - killed_datetime).total_seconds() > 3600:
         killed_datetime += timedelta(days=1)
-
     next_spawn = killed_datetime + timedelta(hours=period.hour, minutes=period.minute)
     spawn_str = next_spawn.strftime("%Y-%m-%d %H:%M")
-
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("UPDATE bosses SET next_spawn = ? WHERE no = ?", (spawn_str, no))
         await db.commit()
+    await interaction.response.send_message(f"✅ ตั้งเวลาฟื้นครั้งถัดไปของบอส {boss_name} เป็น {spawn_str} (เวลาไทย)")
 
-    await interaction.response.send_message(
-        f"เวลา {now} ✅ ตั้งเวลาฟื้นครั้งถัดไปของบอส {boss_name} เป็น {spawn_str}"
-    )
-
-
-
-# -------- Background Notification Task --------
+# ---------- CHECK NOTIFICATIONS ----------
+@tasks.loop(seconds=60)
 async def check_spawn_notifications():
     await bot.wait_until_ready()
     channel = bot.get_channel(CHANNEL_ID)
-    while not bot.is_closed():
-        now = datetime.now()
-        async with aiosqlite.connect(DB_PATH) as db:
-            async with db.execute("SELECT no, name, locate, next_spawn FROM bosses WHERE next_spawn IS NOT NULL") as cursor:
-                rows = await cursor.fetchall()
-        for no, name, locate, next_spawn_str in rows:
-            try:
-                next_spawn_time = datetime.strptime(next_spawn_str, "%Y-%m-%d %H:%M")
-                diff = (next_spawn_time - now).total_seconds()
-                if 0 < diff <= 720:  # ภายใน 10 นาที
-                    await channel.send(f"⏰ ใกล้ถึงเวลาเกิดของ **{name}** อยู่  {locate} แล้ว! อีก {int(diff // 60)} นาที")
-            except Exception as e:
-                print(f"Error parsing spawn time: {e}")
-        await asyncio.sleep(180)
+    if not channel:
+        print("❌ ไม่พบช่องสำหรับแจ้งเตือน")
+        return
+    now = datetime.now(ZoneInfo("Asia/Bangkok"))
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT name, locate, next_spawn FROM bosses WHERE next_spawn IS NOT NULL") as cursor:
+            rows = await cursor.fetchall()
+    for name, locate, next_spawn_str in rows:
+        try:
+            next_spawn_time = datetime.strptime(next_spawn_str, "%Y-%m-%d %H:%M").replace(tzinfo=ZoneInfo("Asia/Bangkok"))
+            diff = (next_spawn_time - now).total_seconds()
+            if 0 < diff <= 600:
+                await channel.send(f"⏰ ใกล้ถึงเวลาเกิดของ **{name}** (อยู่ {locate}) แล้ว! อีก {int(diff // 60)} นาที")
+        except Exception as e:
+            print(f"❌ Error parsing spawn time: {e}")
+
 
 server_on()
 
-bot.run(os.getenv('TOKEN'))
+# ---------- RUN ----------
+async def main():
+    await init_db()
+    await bot.start(TOKEN)
+
+asyncio.run(main())
