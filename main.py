@@ -12,7 +12,7 @@ from myServer import server_on
 # ---------- CONFIG ----------
 TOKEN = os.getenv('TOKEN')  # <-- ใส่ Token จริงที่นี่
 DB_PATH = "bosses.db"
-CHANNEL_ID = 1377663275650515094  # <-- เปลี่ยนเป็น channel id ที่จะใช้แจ้งเตือน
+CHANNEL_ID = 1375815326658461736  # <-- เปลี่ยนเป็น channel id ที่จะใช้แจ้งเตือน
 
 # ---------- BOT SETUP ----------
 intents = discord.Intents.default()
@@ -172,48 +172,6 @@ async def killat(interaction: discord.Interaction, boss_name: str, killed_time: 
         await db.execute("UPDATE bosses SET next_spawn = ? WHERE no = ?", (spawn_str, no))
         await db.commit()
     await interaction.response.send_message(f"✅ ตั้งเวลาฟื้นครั้งถัดไปของบอส {boss_name} เป็น {spawn_str} (เวลาไทย)")
-
-# ---------- EDITBOSS ----------
-@bot.tree.command(name="editboss", description="แก้ไขเวลาหรือสถานที่ของบอส")
-@app_commands.describe(boss_name="ชื่อบอส", period="เวลาใหม่ (HH:MM)", locate="ตำแหน่งใหม่ของบอส (ถ้ามี)")
-@app_commands.autocomplete(boss_name=boss_name_autocomplete)
-async def editboss(interaction: discord.Interaction, boss_name: str, period: str = None, locate: str = None):
-    updates = []
-    values = []
-
-    # ตรวจสอบชื่อบอส
-    async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute("SELECT no FROM bosses WHERE name = ?", (boss_name,))
-        row = await cursor.fetchone()
-    if not row:
-        await interaction.response.send_message("❌ ไม่พบบอสชื่อนี้", ephemeral=True)
-        return
-
-    no = row[0]
-
-    if period:
-        try:
-            period_time = datetime.strptime(period, "%H:%M").time()
-            updates.append("period = ?")
-            values.append(period_time.strftime("%H:%M"))
-        except ValueError:
-            await interaction.response.send_message("❌ รูปแบบเวลาต้องเป็น HH:MM", ephemeral=True)
-            return
-
-    if locate is not None:
-        updates.append("locate = ?")
-        values.append(locate)
-
-    if not updates:
-        await interaction.response.send_message("❌ กรุณาระบุ period หรือ locate อย่างน้อยหนึ่งค่า", ephemeral=True)
-        return
-
-    values.append(no)
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(f"UPDATE bosses SET {', '.join(updates)} WHERE no = ?", values)
-        await db.commit()
-
-    await interaction.response.send_message("✏️ อัปเดตข้อมูลบอสเรียบร้อยแล้ว")
 
 
 # ---------- CHECK NOTIFICATIONS ----------
