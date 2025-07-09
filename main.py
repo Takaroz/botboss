@@ -12,7 +12,7 @@ from myServer import server_on
 # ---------- CONFIG ----------
 TOKEN = os.getenv('TOKEN')  # <-- ใส่ Token จริงที่นี่
 DB_PATH = "bosses.db"
-CHANNEL_ID = 1375815326658461736  # <-- เปลี่ยนเป็น channel id ที่จะใช้แจ้งเตือน
+CHANNEL_ID = 847486457509576718  # <-- เปลี่ยนเป็น channel id ที่จะใช้แจ้งเตือน
 
 # ---------- BOT SETUP ----------
 intents = discord.Intents.default()
