@@ -44,31 +44,31 @@ async def init_db():
                 locate TEXT DEFAULT '-'
             )
         """)
-        await db.executemany("""
-            INSERT INTO bosses (name, locate, period, next_spawn) VALUES (?, ?, ?, ?)
-        """, [
-            ("เชอร์ทูบา", None, "06:00", "2025-05-31 14:14"),
-            ("เคลซอส", None, "10:00", None),
-            ("บาซิลา", None, "04:00", "2025-05-31 09:47"),
-            ("เฟลิส", None, "03:00", "2025-05-31 09:40"),
-            ("ทาลาคิน", None, "10:00", "2025-05-31 15:02"),
-            ("พันดรายด์", None, "12:00", "2025-05-31 09:31"),
-            ("ซาร์ก้า", None, "10:00", "2025-05-31 09:13"),
-            ("ทิมิทริส", None, "08:00", "2025-05-31 13:04"),
-            ("สตัน", None, "07:00", "2025-05-31 12:41"),
-            ("ครูม่ากลายพัน", None, "08:00", "2025-05-31 11:32"),
-            ("พันนาโรด", None, "10:00", "2025-05-31 13:19"),
-            ("เมดูซ่า", None, "10:00", "2025-05-31 14:38"),
-            ("เบรก้า", None, "06:00", "2025-05-31 14:34"),
-            ("มาทูรา", None, "06:00", "2025-05-31 12:18"),
-            ("แบล็คลิลลี่", None, "12:00", "2025-05-31 09:27"),
-            ("เบฮีมอธ", None, "09:00", "2025-05-31 10:50"),
-            ("ซาบัน", "มดชั้น2", "12:00", None),
-            ("ราชินีมด", "มดชั้น3", "06:00", "2025-05-31 09:24"),
-            ("ครูม่าปนเปื้อน", "ครูม่าชั้น 3", "08:00", "2025-05-31 15:51"),
-            ("คาทาน", "ครูม่าชั้น 6", "10:00", "2025-05-31 16:57"),
-            ("คอร์ซัส", "ครูม่าชั้น 7", "10:00", "2025-05-31 15:02"),
-        ])
+        # await db.executemany("""
+        #     INSERT INTO bosses (name, locate, period, next_spawn) VALUES (?, ?, ?, ?)
+        # """, [
+        #     ("เชอร์ทูบา", None, "06:00", "2025-05-31 14:14"),
+        #     ("เคลซอส", None, "10:00", None),
+        #     ("บาซิลา", None, "04:00", "2025-05-31 09:47"),
+        #     ("เฟลิส", None, "03:00", "2025-05-31 09:40"),
+        #     ("ทาลาคิน", None, "10:00", "2025-05-31 15:02"),
+        #     ("พันดรายด์", None, "12:00", "2025-05-31 09:31"),
+        #     ("ซาร์ก้า", None, "10:00", "2025-05-31 09:13"),
+        #     ("ทิมิทริส", None, "08:00", "2025-05-31 13:04"),
+        #     ("สตัน", None, "07:00", "2025-05-31 12:41"),
+        #     ("ครูม่ากลายพัน", None, "08:00", "2025-05-31 11:32"),
+        #     ("พันนาโรด", None, "10:00", "2025-05-31 13:19"),
+        #     ("เมดูซ่า", None, "10:00", "2025-05-31 14:38"),
+        #     ("เบรก้า", None, "06:00", "2025-05-31 14:34"),
+        #     ("มาทูรา", None, "06:00", "2025-05-31 12:18"),
+        #     ("แบล็คลิลลี่", None, "12:00", "2025-05-31 09:27"),
+        #     ("เบฮีมอธ", None, "09:00", "2025-05-31 10:50"),
+        #     ("ซาบัน", "มดชั้น2", "12:00", None),
+        #     ("ราชินีมด", "มดชั้น3", "06:00", "2025-05-31 09:24"),
+        #     ("ครูม่าปนเปื้อน", "ครูม่าชั้น 3", "08:00", "2025-05-31 15:51"),
+        #     ("คาทาน", "ครูม่าชั้น 6", "10:00", "2025-05-31 16:57"),
+        #     ("คอร์ซัส", "ครูม่าชั้น 7", "10:00", "2025-05-31 15:02"),
+        # ])
         await db.commit()
 
 # ---------- ADD BOSS ----------
@@ -224,6 +224,45 @@ async def incoming(interaction: discord.Interaction):
 
     message = "\n".join(lines)
     await interaction.followup.send(message)
+
+@bot.tree.command(name="importbosses", description="นำเข้าข้อมูลบอสจากข้อความตาราง")
+@app_commands.describe(text="ข้อความตารางจากไฟล์หรือแชท")
+async def importbosses(interaction: discord.Interaction, text: str):
+    await interaction.response.defer(ephemeral=True)
+    rows = text.strip().splitlines()
+    inserted, updated = 0, 0
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        for line in rows:
+            parts = line.strip().split(",")
+            if len(parts) < 6:
+                continue  # ข้ามบรรทัดที่ข้อมูลไม่ครบ
+
+            name = parts[1].strip()
+            next_spawn = parts[4].strip()
+            period = parts[5].strip()
+
+            # ตรวจสอบว่ามีอยู่แล้วหรือยัง
+            cursor = await db.execute("SELECT 1 FROM bosses WHERE name = ?", (name,))
+            exists = await cursor.fetchone()
+
+            if exists:
+                await db.execute(
+                    "UPDATE bosses SET next_spawn = ?, period = ? WHERE name = ?",
+                    (next_spawn, period, name)
+                )
+                updated += 1
+            else:
+                await db.execute(
+                    "INSERT INTO bosses (name, next_spawn, period) VALUES (?, ?, ?)",
+                    (name, next_spawn, period)
+                )
+                inserted += 1
+
+        await db.commit()
+
+    await interaction.followup.send(f"✅ เพิ่มใหม่ {inserted} รายการ, อัปเดต {updated} รายการเรียบร้อยแล้ว", ephemeral=True)
+
 
 
 
