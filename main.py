@@ -225,43 +225,47 @@ async def incoming(interaction: discord.Interaction):
     message = "\n".join(lines)
     await interaction.followup.send(message)
 
-@bot.tree.command(name="importbosses", description="นำเข้าข้อมูลบอสจากข้อความตาราง")
-@app_commands.describe(text="ข้อความตารางจากไฟล์หรือแชท")
-async def importbosses(interaction: discord.Interaction, text: str):
-    await interaction.response.defer(ephemeral=True)
-    rows = text.strip().splitlines()
-    inserted, updated = 0, 0
+@bot.event
+async def on_message(message):
+    if message.author.bot:
+        return
 
-    async with aiosqlite.connect(DB_PATH) as db:
-        for line in rows:
-            parts = line.strip().split(",")
-            if len(parts) < 6:
-                continue  # ข้ามบรรทัดที่ข้อมูลไม่ครบ
+    if message.content.startswith("!importbosses"):
+        lines = message.content.splitlines()[1:]  # ข้ามบรรทัดแรก
+        inserted, updated = 0, 0
 
-            name = parts[1].strip()
-            next_spawn = parts[4].strip()
-            period = parts[5].strip()
+        async with aiosqlite.connect(DB_PATH) as db:
+            for line in lines:
+                parts = line.strip().split(",")
+                if len(parts) < 6:
+                    continue  # ข้ามถ้าข้อมูลไม่ครบ
 
-            # ตรวจสอบว่ามีอยู่แล้วหรือยัง
-            cursor = await db.execute("SELECT 1 FROM bosses WHERE name = ?", (name,))
-            exists = await cursor.fetchone()
+                name = parts[1].strip()
+                next_spawn = parts[4].strip()
+                period = parts[5].strip()
 
-            if exists:
-                await db.execute(
-                    "UPDATE bosses SET next_spawn = ?, period = ? WHERE name = ?",
-                    (next_spawn, period, name)
-                )
-                updated += 1
-            else:
-                await db.execute(
-                    "INSERT INTO bosses (name, next_spawn, period) VALUES (?, ?, ?)",
-                    (name, next_spawn, period)
-                )
-                inserted += 1
+                cursor = await db.execute("SELECT 1 FROM bosses WHERE name = ?", (name,))
+                exists = await cursor.fetchone()
 
-        await db.commit()
+                if exists:
+                    await db.execute(
+                        "UPDATE bosses SET next_spawn = ?, period = ? WHERE name = ?",
+                        (next_spawn, period, name)
+                    )
+                    updated += 1
+                else:
+                    await db.execute(
+                        "INSERT INTO bosses (name, next_spawn, period) VALUES (?, ?, ?)",
+                        (name, next_spawn, period)
+                    )
+                    inserted += 1
 
-    await interaction.followup.send(f"✅ เพิ่มใหม่ {inserted} รายการ, อัปเดต {updated} รายการเรียบร้อยแล้ว", ephemeral=True)
+            await db.commit()
+
+        await message.channel.send(f"✅ เพิ่มใหม่ {inserted} รายการ, อัปเดต {updated} รายการเรียบร้อยแล้ว")
+
+    await bot.process_commands(message)  # ให้คำสั่งอื่นยังใช้งานได้
+
 
 
 
