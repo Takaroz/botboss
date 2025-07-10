@@ -72,6 +72,45 @@ async def init_db():
         # ])
         await db.commit()
 
+@bot.event
+async def on_message(message):
+    if message.author.bot:
+        return
+
+    if message.content.startswith("!importbosses"):
+        lines = message.content.splitlines()[1:]  # ข้ามบรรทัดแรก
+        inserted, updated = 0, 0
+
+        async with aiosqlite.connect(DB_PATH) as db:
+            for line in lines:
+                parts = line.strip().split(",")
+                if len(parts) < 6:
+                    continue  # ข้ามถ้าข้อมูลไม่ครบ
+
+                name = parts[1].strip()
+                next_spawn = parts[4].strip()
+                period = parts[5].strip()
+
+                cursor = await db.execute("SELECT 1 FROM bosses WHERE name = ?", (name,))
+                exists = await cursor.fetchone()
+
+                if exists:
+                    await db.execute(
+                        "UPDATE bosses SET next_spawn = ?, period = ? WHERE name = ?",
+                        (next_spawn, period, name)
+                    )
+                    updated += 1
+                else:
+                    await db.execute(
+                        "INSERT INTO bosses (name, next_spawn, period) VALUES (?, ?, ?)",
+                        (name, next_spawn, period)
+                    )
+                    inserted += 1
+
+            await db.commit()
+
+        await message.channel.send(f"✅ เพิ่มใหม่ {inserted} รายการ, อัปเดต {updated} รายการเรียบร้อยแล้ว")
+
 # ---------- ADD BOSS ----------
 @bot.tree.command(name="addboss", description="เพิ่มบอสใหม่")
 @app_commands.describe(name="ชื่อบอส", period="ช่วงเวลาเกิดใหม่ (HH:MM)", locate="สถานที่")
@@ -225,45 +264,6 @@ async def incoming(interaction: discord.Interaction):
 
     message = "\n".join(lines)
     await interaction.followup.send(message)
-
-@bot.event
-async def on_message(message):
-    if message.author.bot:
-        return
-
-    if message.content.startswith("!importbosses"):
-        lines = message.content.splitlines()[1:]  # ข้ามบรรทัดแรก
-        inserted, updated = 0, 0
-
-        async with aiosqlite.connect(DB_PATH) as db:
-            for line in lines:
-                parts = line.strip().split(",")
-                if len(parts) < 6:
-                    continue  # ข้ามถ้าข้อมูลไม่ครบ
-
-                name = parts[1].strip()
-                next_spawn = parts[4].strip()
-                period = parts[5].strip()
-
-                cursor = await db.execute("SELECT 1 FROM bosses WHERE name = ?", (name,))
-                exists = await cursor.fetchone()
-
-                if exists:
-                    await db.execute(
-                        "UPDATE bosses SET next_spawn = ?, period = ? WHERE name = ?",
-                        (next_spawn, period, name)
-                    )
-                    updated += 1
-                else:
-                    await db.execute(
-                        "INSERT INTO bosses (name, next_spawn, period) VALUES (?, ?, ?)",
-                        (name, next_spawn, period)
-                    )
-                    inserted += 1
-
-            await db.commit()
-
-        await message.channel.send(f"✅ เพิ่มใหม่ {inserted} รายการ, อัปเดต {updated} รายการเรียบร้อยแล้ว")
 
     await bot.process_commands(message)  # ให้คำสั่งอื่นยังใช้งานได้
 
