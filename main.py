@@ -6,6 +6,10 @@ import asyncio
 import aiosqlite
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+import re
+import requests
+import aiohttp
+import sqlite3
 
 from myServer import server_on
 
@@ -62,30 +66,27 @@ def parse_ocr_text(ocr_text):
     return boss_data
 
 # สร้างตารางและเพิ่มข้อมูล
-def save_bosses_to_db(boss_data):
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    for row in boss_data:
-        name_th, name_en, locate, period, next_spawn, chance = row
+async def save_bosses_to_db(boss_data):
+    async with aiosqlite.connect(DB_PATH) as db:
+        for row in boss_data:
+            name_th, name_en, locate, period, next_spawn, chance = row
 
-        # ตรวจสอบว่ามี name_en อยู่แล้วหรือยัง
-        cur.execute("SELECT no FROM bosses WHERE name_en = ?", (name_en,))
-        result = cur.fetchone()
+            cursor = await db.execute("SELECT no FROM bosses WHERE name_en = ?", (name_en,))
+            result = await cursor.fetchone()
 
-        if result:
-            cur.execute("""
-                UPDATE bosses
-                SET name_th = ?, locate = ?, period = ?, next_spawn = ?, chance = ?
-                WHERE name_en = ?
-            """, (name_th, locate, period, next_spawn, chance, name_en))
-        else:
-            cur.execute("""
-                INSERT INTO bosses (name_th, name_en, locate, period, next_spawn, chance)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (name_th, name_en, locate, period, next_spawn, chance))
+            if result:
+                await db.execute("""
+                    UPDATE bosses
+                    SET name_th = ?, locate = ?, period = ?, next_spawn = ?, chance = ?
+                    WHERE name_en = ?
+                """, (name_th, locate, period, next_spawn, chance, name_en))
+            else:
+                await db.execute("""
+                    INSERT INTO bosses (name_th, name_en, locate, period, next_spawn, chance)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (name_th, name_en, locate, period, next_spawn, chance))
 
-    conn.commit()
-    conn.close()
+        await db.commit()
 
 # ---------- AUTOCOMPLETE ----------
 async def boss_name_autocomplete(interaction: discord.Interaction, current: str):
@@ -116,7 +117,7 @@ async def init_db():
             )
         """)
         await db.executemany("""
-            INSERT INTO bosses (name, locate, period, next_spawn) VALUES (?, ?, ?, ?)
+            INSERT INTO bosses (name_th, name_en, locate, period, next_spawn, chance) VALUES (?, ?, ?, ?)
         """, [
             ("เชอร์ทูบา", "Chertuba", None, "06:00", "2025-05-31 14:14", 100),
             ("เคลซอส", "Kelsos", None, "10:00", None, 100),
@@ -156,7 +157,7 @@ async def addboss(interaction: discord.Interaction, name: str, period: str, loca
         await interaction.response.send_message("❌ รูปแบบเวลาไม่ถูกต้อง (ต้องเป็น HH:MM)", ephemeral=True)
         return
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("INSERT INTO bosses (name, period, locate) VALUES (?, ?, ?)", (name, period, locate))
+        await db.execute("INSERT INTO bosses (name_th, name_en, period, locate, chance) VALUES (?, ?, ?, ?, ?)", (name_th, name_en, period, locate, chance))
         await db.commit()
     await interaction.response.send_message(f"✅ เพิ่มบอส {name} แล้ว")
 
