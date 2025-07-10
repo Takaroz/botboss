@@ -13,10 +13,79 @@ from myServer import server_on
 TOKEN = os.getenv('TOKEN')  # <-- ใส่ Token จริงที่นี่
 DB_PATH = "bosses.db"
 CHANNEL_ID = 847486457509576718  # <-- เปลี่ยนเป็น channel id ที่จะใช้แจ้งเตือน
+API_KEY = "K89378558488957"
 
 # ---------- BOT SETUP ----------
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="/", intents=intents)
+
+# OCR API
+async def ocr_space_file(filepath, api_key=API_KEY, language='tha'):
+    url = 'https://api.ocr.space/parse/image'
+    with open(filepath, 'rb') as f:
+        response = requests.post(
+            url,
+            files={os.path.basename(filepath): f},
+            data={'apikey': api_key, 'language': language},
+        )
+    result = response.json()
+    return result['ParsedResults'][0]['ParsedText'] if 'ParsedResults' in result else None
+
+# แปลงข้อความเป็นข้อมูลบอส
+def parse_ocr_text(ocr_text):
+    lines = ocr_text.strip().split("\n")
+    boss_data = []
+
+    for line in lines:
+        parts = re.split(r'\s{2,}|\t', line.strip())
+        if len(parts) >= 7:
+            try:
+                no = int(parts[0])
+                name_en = parts[1].strip()
+                name_th = parts[2].strip()
+                period_raw = parts[3].strip()
+                spawn_time_raw = parts[4].strip()
+                cooldown = parts[5].strip()
+                chance = int(parts[6].replace('%', '').strip())
+
+                period_parts = period_raw.split(":")
+                if len(period_parts) >= 2:
+                    period = f"{int(period_parts[0]):02}:{int(period_parts[1]):02}"
+                else:
+                    continue
+
+                spawn_time = f"2025-07-10 {spawn_time_raw[:5]}" if ":" in spawn_time_raw else None
+
+                boss_data.append((name_th, name_en, None, period, spawn_time, chance))
+            except:
+                pass
+    return boss_data
+
+# สร้างตารางและเพิ่มข้อมูล
+def save_bosses_to_db(boss_data):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    for row in boss_data:
+        name_th, name_en, locate, period, next_spawn, chance = row
+
+        # ตรวจสอบว่ามี name_en อยู่แล้วหรือยัง
+        cur.execute("SELECT no FROM bosses WHERE name_en = ?", (name_en,))
+        result = cur.fetchone()
+
+        if result:
+            cur.execute("""
+                UPDATE bosses
+                SET name_th = ?, locate = ?, period = ?, next_spawn = ?, chance = ?
+                WHERE name_en = ?
+            """, (name_th, locate, period, next_spawn, chance, name_en))
+        else:
+            cur.execute("""
+                INSERT INTO bosses (name_th, name_en, locate, period, next_spawn, chance)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (name_th, name_en, locate, period, next_spawn, chance))
+
+    conn.commit()
+    conn.close()
 
 # ---------- AUTOCOMPLETE ----------
 async def boss_name_autocomplete(interaction: discord.Interaction, current: str):
@@ -230,6 +299,33 @@ async def incoming(interaction: discord.Interaction):
 
     message = "\n".join(lines)
     await interaction.followup.send(message)
+
+# รับรูปภาพจากข้อความ
+@bot.event
+async def on_message(message):
+    if message.attachments:
+        for attachment in message.attachments:
+            if attachment.filename.lower().endswith((".png", ".jpg", ".jpeg")):
+                await message.channel.send("📥 กำลังประมวลผลภาพ OCR...")
+
+                filepath = f"temp_{attachment.filename}"
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(attachment.url) as resp:
+                        with open(filepath, 'wb') as f:
+                            f.write(await resp.read())
+
+                ocr_text = await ocr_space_file(filepath)
+                if not ocr_text:
+                    await message.channel.send("❌ ไม่สามารถดึงข้อความจากภาพได้")
+                    return
+
+                boss_data = parse_ocr_text(ocr_text)
+                save_bosses_to_db(boss_data)
+                await message.channel.send(f"✅ เพิ่มข้อมูลบอสจากภาพเรียบร้อยแล้ว ({len(boss_data)} ตัว)")
+
+                os.remove(filepath)
+
+    await bot.process_commands(message)
 
 
 
