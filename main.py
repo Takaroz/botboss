@@ -16,7 +16,8 @@ CHANNEL_ID = 847486457509576718  # <-- เปลี่ยนเป็น channel
 
 # ---------- BOT SETUP ----------
 intents = discord.Intents.default()
-bot = commands.Bot(command_prefix="/", intents=intents)
+bot = commands.Bot(command_prefix="!", intents=intents)
+#bot = commands.Bot(command_prefix="/", intents=intents)
 
 # ---------- AUTOCOMPLETE ----------
 async def boss_name_autocomplete(interaction: discord.Interaction, current: str):
