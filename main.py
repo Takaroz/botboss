@@ -79,38 +79,64 @@ async def on_message(message):
         return
 
     if message.content.startswith("!importbosses"):
-        lines = message.content.splitlines()[1:]  # ข้ามบรรทัดแรก
+        lines = message.content.splitlines()[1:]
         inserted, updated = 0, 0
+
+        now = datetime.now(ZoneInfo("Asia/Bangkok"))
+        current_date = now.date()
+        previous_time = None
 
         async with aiosqlite.connect(DB_PATH) as db:
             for line in lines:
                 parts = line.strip().split(",")
                 if len(parts) < 6:
-                    continue  # ข้ามถ้าข้อมูลไม่ครบ
+                    continue
 
                 name = parts[1].strip()
-                next_spawn = parts[4].strip()
-                period = parts[5].strip()
+                next_time_str = parts[4].strip()
+                period_str = parts[5].strip()
 
+                # แปลง next_spawn เป็น time
+                try:
+                    spawn_time_obj = datetime.strptime(next_time_str, "%H:%M:%S").time()
+                except ValueError:
+                    try:
+                        spawn_time_obj = datetime.strptime(next_time_str, "%H:%M").time()
+                    except Exception as e:
+                        print(f"❌ ข้าม {name} เนื่องจากรูปแบบเวลาไม่ถูกต้อง: {e}")
+                        continue
+
+                # ข้ามวันถ้าตัวถัดไปมีเวลาน้อยกว่าตัวก่อน
+                if previous_time and spawn_time_obj < previous_time:
+                    current_date += timedelta(days=1)
+
+                previous_time = spawn_time_obj
+
+                # สร้าง datetime แบบไม่มีวินาที
+                spawn_datetime = datetime.combine(current_date, spawn_time_obj).replace(tzinfo=ZoneInfo("Asia/Bangkok"))
+                spawn_str = spawn_datetime.strftime("%Y-%m-%d %H:%M")  # ✅ ไม่เอาวินาที
+
+                # ตรวจสอบว่ามีอยู่หรือยัง
                 cursor = await db.execute("SELECT 1 FROM bosses WHERE name = ?", (name,))
                 exists = await cursor.fetchone()
 
                 if exists:
                     await db.execute(
                         "UPDATE bosses SET next_spawn = ?, period = ? WHERE name = ?",
-                        (next_spawn, period, name)
+                        (spawn_str, period_str, name)
                     )
                     updated += 1
                 else:
                     await db.execute(
                         "INSERT INTO bosses (name, next_spawn, period) VALUES (?, ?, ?)",
-                        (name, next_spawn, period)
+                        (name, spawn_str, period_str)
                     )
                     inserted += 1
 
             await db.commit()
 
         await message.channel.send(f"✅ เพิ่มใหม่ {inserted} รายการ, อัปเดต {updated} รายการเรียบร้อยแล้ว")
+
 
 # ---------- ADD BOSS ----------
 @bot.tree.command(name="addboss", description="เพิ่มบอสใหม่")
