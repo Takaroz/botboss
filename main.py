@@ -136,6 +136,7 @@ async def on_message(message):
             await db.commit()
 
         await message.channel.send(f"✅ เพิ่มใหม่ {inserted} รายการ, อัปเดต {updated} รายการเรียบร้อยแล้ว")
+        await bot.process_commands(message)  # ให้คำสั่งอื่นยังใช้งานได้
 
 
 # ---------- ADD BOSS ----------
@@ -292,7 +293,7 @@ async def incoming(interaction: discord.Interaction):
     message = "\n".join(lines)
     await interaction.followup.send(message)
 
-    await bot.process_commands(message)  # ให้คำสั่งอื่นยังใช้งานได้
+    
 
 
 
