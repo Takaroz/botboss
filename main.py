@@ -82,16 +82,14 @@ async def on_message(message):
         lines = message.content.splitlines()[1:]
         inserted, updated = 0, 0
 
-        now = datetime.now(ZoneInfo("Asia/Bangkok"))
-        current_date = now.date()
-        previous_time = None
-
-        async with aiosqlite.connect(DB_PATH) as db:
+        async with (aiosqlite.connect(DB_PATH) as db):
             for line in lines:
                 parts = line.strip().split(",")
                 if len(parts) < 6:
                     continue
 
+                now = datetime.now(ZoneInfo("Asia/Bangkok"))
+                current_date = now.date()
                 name = parts[1].strip()
                 next_time_str = parts[4].strip()
                 period_str = parts[5].strip()
@@ -111,10 +109,6 @@ async def on_message(message):
                 spawn_time_str = spawn_time_obj.strftime("%H:%M")
                 if now_str > spawn_time_str:
                     current_date += timedelta(days=1)
-                #if previous_time and spawn_time_obj < previous_time:
-                #    current_date += timedelta(days=1)
-
-                previous_time = spawn_time_obj
 
                 # สร้าง datetime แบบไม่มีวินาที
                 spawn_datetime = datetime.combine(current_date, spawn_time_obj).replace(tzinfo=ZoneInfo("Asia/Bangkok"))
