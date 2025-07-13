@@ -107,8 +107,12 @@ async def on_message(message):
                         continue
 
                 # ข้ามวันถ้าตัวถัดไปมีเวลาน้อยกว่าตัวก่อน
-                if previous_time and spawn_time_obj < previous_time:
+                now_str = now.strftime("%H:%M")
+                spawn_time_str = spawn_time_obj.strftime("%H:%M")
+                if now_str > spawn_time_str:
                     current_date += timedelta(days=1)
+                #if previous_time and spawn_time_obj < previous_time:
+                #    current_date += timedelta(days=1)
 
                 previous_time = spawn_time_obj
 
