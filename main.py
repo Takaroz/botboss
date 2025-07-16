@@ -320,7 +320,7 @@ async def check_spawn_notifications():
             diff = (next_spawn_time - now).total_seconds()
             if (240 < diff <= 300) or (0 < diff <= 120):
                 now_str = now.strftime("%H:%M")
-                await channel.send(f"⏰ {occ} ({now_str}) ใกล้ถึงเวลาเกิดของ **{name}** (อยู่ {locate}) แล้ว! อีก {int(diff // 60)} นาที({next_spawn_time.strftime('%H:%M')})")
+                await channel.send(f"⏰ {occ} ({now_str}) ใกล้ถึงเวลาเกิดของ **{name}** (อยู่ {locate}) แล้ว! อีก {int(diff // 60) + 1} นาที({next_spawn_time.strftime('%H:%M')})")
         except Exception as e:
             print(f"❌ Error parsing spawn time: {e}")
 
