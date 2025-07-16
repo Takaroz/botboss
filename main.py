@@ -260,19 +260,19 @@ async def incoming(interaction: discord.Interaction):
     now = datetime.now() + timedelta(hours=7)  # ปรับเวลาประเทศไทย
 
     async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute("SELECT name, next_spawn FROM bosses WHERE next_spawn IS NOT NULL")
+        cursor = await db.execute("SELECT name, next_spawn, occ FROM bosses WHERE next_spawn IS NOT NULL")
         rows = await cursor.fetchall()
 
     upcoming = []
     past = []
 
-    for name, next_spawn_str in rows:
+    for name, next_spawn_str, occ in rows:
         try:
             next_spawn = datetime.strptime(next_spawn_str, "%Y-%m-%d %H:%M")
             if next_spawn >= now:
-                upcoming.append((next_spawn, name))
+                upcoming.append((next_spawn, name, occ))
             else:
-                past.append((next_spawn, name))
+                past.append((next_spawn, name, occ))
         except Exception as e:
             print(f"❌ Error parsing next_spawn for {name}: {e}")
 
@@ -286,12 +286,12 @@ async def incoming(interaction: discord.Interaction):
         return
 
     lines = []
-    for spawn_time, name in all_bosses:
+    for spawn_time, name, occ in all_bosses:
         diff_min = int((spawn_time - now).total_seconds() // 60)
         if diff_min >= 0:
-            lines.append(f"🕒 **{name}** – ฟื้นในอีก {diff_min} นาที ({spawn_time.strftime('%H:%M')})")
+            lines.append(f"🕒 **{name}** – โอกาส {occ} ฟื้นในอีก {diff_min} นาที ({spawn_time.strftime('%H:%M')})")
         else:
-            lines.append(f"⏳ **{name}** – เกิดแล้วเมื่อ {abs(diff_min)} นาทีที่แล้ว ({spawn_time.strftime('%H:%M')})")
+            lines.append(f"⏳ **{name}** – ผ่านแล้วเมื่อ {abs(diff_min)} นาทีที่แล้ว ({spawn_time.strftime('%H:%M')})")
 
     message = "\n".join(lines)
     await interaction.followup.send(message)
