@@ -43,7 +43,8 @@ async def init_db():
                 name TEXT NOT NULL,
                 period TEXT NOT NULL,
                 next_spawn TEXT,
-                locate TEXT DEFAULT '-'
+                locate TEXT DEFAULT '-',
+                occ TEXT DEFAULT '-'
             )
         """)
         # await db.executemany("""
@@ -93,6 +94,10 @@ async def on_message(message):
                 name = parts[1].strip()
                 next_time_str = parts[4].strip()
                 period_str = parts[5].strip()
+                if len(parts) > 6 and parts[6].strip():
+                    occ = parts[6].strip()
+                else:
+                    occ = "-"
 
                 # แปลง next_spawn เป็น time
                 try:
@@ -120,14 +125,14 @@ async def on_message(message):
 
                 if exists:
                     await db.execute(
-                        "UPDATE bosses SET next_spawn = ?, period = ? WHERE name = ?",
+                        "UPDATE bosses SET next_spawn = ?, period = ?, occ = ? WHERE name = ?",
                         (spawn_str, period_str, name)
                     )
                     updated += 1
                 else:
                     await db.execute(
-                        "INSERT INTO bosses (name, next_spawn, period) VALUES (?, ?, ?)",
-                        (name, spawn_str, period_str)
+                        "INSERT INTO bosses (name, next_spawn, period, occ) VALUES (?, ?, ?, ?)",
+                        (name, spawn_str, period_str, occ)
                     )
                     inserted += 1
 
@@ -139,15 +144,15 @@ async def on_message(message):
 
 # ---------- ADD BOSS ----------
 @bot.tree.command(name="addboss", description="เพิ่มบอสใหม่")
-@app_commands.describe(name="ชื่อบอส", period="ช่วงเวลาเกิดใหม่ (HH:MM)", locate="สถานที่")
-async def addboss(interaction: discord.Interaction, name: str, period: str, locate: str = "-"):
+@app_commands.describe(name="ชื่อบอส", period="ช่วงเวลาเกิดใหม่ (HH:MM)", locate="สถานที่", occ="โอกาสเกิด")
+async def addboss(interaction: discord.Interaction, name: str, period: str, locate: str = "-", occ: str = "-"):
     try:
         datetime.strptime(period, "%H:%M")
     except ValueError:
         await interaction.response.send_message("❌ รูปแบบเวลาไม่ถูกต้อง (ต้องเป็น HH:MM)", ephemeral=True)
         return
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("INSERT INTO bosses (name, period, locate) VALUES (?, ?, ?)", (name, period, locate))
+        await db.execute("INSERT INTO bosses (name, period, locate, occ) VALUES (?, ?, ?, ?)", (name, period, locate, occ))
         await db.commit()
     await interaction.response.send_message(f"✅ เพิ่มบอส {name} แล้ว")
 
@@ -155,14 +160,14 @@ async def addboss(interaction: discord.Interaction, name: str, period: str, loca
 @bot.tree.command(name="listboss", description="แสดงรายชื่อบอสทั้งหมด")
 async def listboss(interaction: discord.Interaction):
     async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("SELECT no, name, locate, period, next_spawn FROM bosses ORDER BY no ASC") as cursor:
+        async with db.execute("SELECT no, name, locate, period, next_spawn, occ FROM bosses ORDER BY no ASC") as cursor:
             rows = await cursor.fetchall()
     if not rows:
         await interaction.response.send_message("⚠️ ยังไม่มีข้อมูลบอสในระบบ")
         return
     msg = "**📋 รายชื่อบอสทั้งหมด:**\n"
-    for no, name, locate, period, next_spawn in rows:
-        msg += f"NO.{no}\t {name}\t {locate}\t ({period})\t {next_spawn}\n"
+    for no, name, locate, period, next_spawn, occ in rows:
+        msg += f"NO.{no}\t {name}\t {locate}\t ({period})\t {next_spawn}\t {occ}\n"
     await interaction.response.send_message(msg)
 
 # ---------- DELETE BOSS ----------
@@ -177,17 +182,17 @@ async def deleteboss(interaction: discord.Interaction, boss_name: str):
 
 # ---------- EDIT BOSS ----------
 @bot.tree.command(name="editboss", description="แก้ไขชื่อและเวลาของบอส")
-@app_commands.describe(no="หมายเลขบอส", name="ชื่อใหม่", period="เวลาใหม่ (HH:MM)")
-async def editboss(interaction: discord.Interaction, no: int, name: str, period: str):
+@app_commands.describe(no="หมายเลขบอส", name="ชื่อใหม่", period="เวลาใหม่ (HH:MM)", locate="ที่อยู่", occ="โอกาสเกิด")
+async def editboss(interaction: discord.Interaction, no: int, name: str, period: str, locate: str, occ: str):
     try:
         datetime.strptime(period, "%H:%M")
     except ValueError:
         await interaction.response.send_message("❌ รูปแบบเวลาไม่ถูกต้อง (ต้องเป็น HH:MM)", ephemeral=True)
         return
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("UPDATE bosses SET name = ?, period = ? WHERE no = ?", (name, period, no))
+        await db.execute("UPDATE bosses SET name = ?, period = ?, locate = ?, occ = ? WHERE no = ?", (name, period, locate, occ, no))
         await db.commit()
-    await interaction.response.send_message(f"✏️ แก้ไขบอสหมายเลข {no} เป็น {name} ({period}) เรียบร้อย")
+    await interaction.response.send_message(f"✏️ แก้ไขบอสหมายเลข {no} เป็น {name} ({period}) อยู่ {locate} โอกาสเกิด {occ} เรียบร้อย")
 
 # ---------- KILLNOW ----------
 @bot.tree.command(name="killnow", description="แจ้งเวลาที่บอสตายตอนนี้")
@@ -307,15 +312,15 @@ async def check_spawn_notifications():
         return
     now = datetime.now(ZoneInfo("Asia/Bangkok"))
     async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("SELECT name, locate, next_spawn FROM bosses WHERE next_spawn IS NOT NULL") as cursor:
+        async with db.execute("SELECT name, locate, next_spawn, occ FROM bosses WHERE next_spawn IS NOT NULL") as cursor:
             rows = await cursor.fetchall()
-    for name, locate, next_spawn_str in rows:
+    for name, locate, next_spawn_str, occ in rows:
         try:
             next_spawn_time = datetime.strptime(next_spawn_str, "%Y-%m-%d %H:%M").replace(tzinfo=ZoneInfo("Asia/Bangkok"))
             diff = (next_spawn_time - now).total_seconds()
             if (240 < diff <= 300) or (0 < diff <= 120):
                 now_str = now.strftime("%H:%M")
-                await channel.send(f"⏰ ({now_str}) ใกล้ถึงเวลาเกิดของ **{name}** (อยู่ {locate}) แล้ว! อีก {int(diff // 60)} นาที")
+                await channel.send(f"⏰ {occ} ({now_str}) ใกล้ถึงเวลาเกิดของ **{name}** (อยู่ {locate}) แล้ว! อีก {int(diff // 60)} นาที({next_spawn_time.strftime('%H:%M')})")
         except Exception as e:
             print(f"❌ Error parsing spawn time: {e}")
 
