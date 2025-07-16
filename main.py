@@ -313,7 +313,7 @@ async def check_spawn_notifications():
         try:
             next_spawn_time = datetime.strptime(next_spawn_str, "%Y-%m-%d %H:%M").replace(tzinfo=ZoneInfo("Asia/Bangkok"))
             diff = (next_spawn_time - now).total_seconds()
-            if 0 < diff <= 300:
+            if (240 < diff <= 300) or (0 < diff <= 120):
                 now_str = now.strftime("%H:%M")
                 await channel.send(f"⏰ ({now_str}) ใกล้ถึงเวลาเกิดของ **{name}** (อยู่ {locate}) แล้ว! อีก {int(diff // 60)} นาที")
         except Exception as e:
