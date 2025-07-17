@@ -77,6 +77,7 @@ async def init_db():
 @bot.event
 async def on_message(message):
     if message.author.bot:
+        print("ดีครับ")
         return
 
     if message.content.startswith("!importbosses"):
