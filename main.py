@@ -75,67 +75,87 @@ async def init_db():
         await db.commit()
 
 @bot.event
-async def on_message(message):
+async def on_message(message: discord.Message):
+    # อย่าจับข้อความของบอตตัวเอง
     if message.author.bot:
         return
 
-    if message.content.startswith("!importbosses"):
-        print("📥 ได้รับคำสั่ง !importbosses")
-        lines = message.content.splitlines()[1:]
-        inserted, updated = 0, 0
+    content = message.content.strip()  # ตัดช่องว่าง/บรรทัดนำท้าย
+    if content.lower().startswith("!importbosses"):
+        tz = ZoneInfo("Asia/Bangkok")
+        lines_raw = content.splitlines()[1:]  # ตัดบรรทัดคำสั่ง
+        # กรองบรรทัดว่าง
+        lines = [ln for ln in lines_raw if ln.strip()]
 
-        async with aiosqlite.connect(DB_PATH) as db:  # ✅ แก้ตรงนี้
+        inserted, updated = 0, 0
+        current_date = datetime.now(tz).date()
+        last_time = None  # เก็บเวลาแถวก่อนหน้า เพื่อตรวจข้ามวัน
+
+        async with aiosqlite.connect(DB_PATH) as db:
             for line in lines:
-                parts = line.strip().split(",")
+                parts = [p.strip() for p in line.split(",")]
+
+                # ต้องมีอย่างน้อย 6 คอลัมน์: no, name, locate, ???, next_time, period, [occ]
                 if len(parts) < 6:
+                    print(f"⚠️ บรรทัดขาดคอลัมน์: {line!r}")
                     continue
 
-                now = datetime.now(ZoneInfo("Asia/Bangkok"))
-                current_date = now.date()
-                name = parts[1].strip()
-                next_time_str = parts[4].strip()
-                period_str = parts[5].strip()
-                occ = parts[6].strip() if len(parts) > 6 and parts[6].strip() else "-"
+                # mapping field (ปรับตามรูปแบบจริงของคุณ)
+                # parts: 0=no, 1=name, 2=locate, 3=ignored?, 4=next_time, 5=period, 6=occ(optional)
+                name = parts[1]
+                locate = parts[2] if parts[2] else "-"
+                next_time_str = parts[4]
+                period_str = parts[5]
+                occ = parts[6] if len(parts) > 6 and parts[6] else "-"
 
-                # แปลง next_spawn เป็น time
-                try:
-                    spawn_time_obj = datetime.strptime(next_time_str, "%H:%M:%S").time()
-                except ValueError:
+                # parse เวลาฟื้น
+                spawn_time_obj = None
+                for fmt in ("%H:%M:%S", "%H:%M"):
                     try:
-                        spawn_time_obj = datetime.strptime(next_time_str, "%H:%M").time()
-                    except Exception as e:
-                        print(f"❌ ข้าม {name} เนื่องจากรูปแบบเวลาไม่ถูกต้อง: {e}")
-                        continue
+                        spawn_time_obj = datetime.strptime(next_time_str, fmt).time()
+                        break
+                    except ValueError:
+                        pass
+                if spawn_time_obj is None:
+                    print(f"❌ ข้าม {name}: เวลา '{next_time_str}' ไม่ตรงฟอร์แมต")
+                    continue
 
-                # ✅ ใช้เวลาเปรียบกันจริง ๆ
-                if now.time() > spawn_time_obj:
+                # ตรรกะข้ามวันตามลำดับไฟล์นำเข้า:
+                # แถวแรก = วันนี้, แถวถัดไป ถ้าเวลาน้อยกว่า (หรือเท่ากับ) เวลาแถวก่อนหน้า → +1 วัน
+                if last_time is not None and spawn_time_obj <= last_time:
                     current_date += timedelta(days=1)
+                last_time = spawn_time_obj
 
-                spawn_datetime = datetime.combine(current_date, spawn_time_obj).replace(tzinfo=ZoneInfo("Asia/Bangkok"))
-                spawn_str = spawn_datetime.strftime("%Y-%m-%d %H:%M")
+                # รวมวัน+เวลา (ไม่มีวินาทีตามที่ต้องการ)
+                spawn_dt = datetime.combine(current_date, spawn_time_obj).replace(tzinfo=tz)
+                spawn_str = spawn_dt.strftime("%Y-%m-%d %H:%M")
 
-                # ตรวจสอบว่ามีอยู่หรือยัง
+                # ตรวจว่ามีชื่อใน DB หรือยัง
                 cursor = await db.execute("SELECT 1 FROM bosses WHERE name = ?", (name,))
                 exists = await cursor.fetchone()
 
                 if exists:
                     await db.execute(
-                        "UPDATE bosses SET next_spawn = ?, period = ?, occ = ? WHERE name = ?",
-                        (spawn_str, period_str, name)
+                        "UPDATE bosses SET next_spawn = ?, period = ?, locate = ?, occ = ? WHERE name = ?",
+                        (spawn_str, period_str, locate, occ, name)
                     )
                     updated += 1
                 else:
                     await db.execute(
-                        "INSERT INTO bosses (name, next_spawn, period, occ) VALUES (?, ?, ?, ?)",
-                        (name, spawn_str, period_str, occ)
+                        "INSERT INTO bosses (name, next_spawn, period, locate, occ) VALUES (?, ?, ?, ?, ?)",
+                        (name, spawn_str, period_str, locate, occ)
                     )
                     inserted += 1
 
             await db.commit()
 
-        await message.channel.send(f"✅ เพิ่มใหม่ {inserted} รายการ, อัปเดต {updated} รายการเรียบร้อยแล้ว")
+        await message.channel.send(
+            f"✅ เพิ่มใหม่ {inserted} รายการ, อัปเดต {updated} รายการเรียบร้อยแล้ว"
+        )
 
-    await bot.process_commands(message)  # ✅ ต้องอยู่นอก if
+    # สำคัญ: ให้คำสั่งอื่นยังทำงาน
+    await bot.process_commands(message)
+
 
 
 
