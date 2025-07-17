@@ -77,28 +77,25 @@ async def init_db():
 @bot.event
 async def on_message(message):
     if message.author.bot:
-        print("ดีครับ")
         return
 
     if message.content.startswith("!importbosses"):
+        print("📥 ได้รับคำสั่ง !importbosses")
         lines = message.content.splitlines()[1:]
         inserted, updated = 0, 0
 
-        async with (aiosqlite.connect(DB_PATH) as db):
+        async with aiosqlite.connect(DB_PATH) as db:  # ✅ แก้ตรงนี้
             for line in lines:
                 parts = line.strip().split(",")
-                #if len(parts) < 6:
-                #   continue
+                if len(parts) < 6:
+                    continue
 
                 now = datetime.now(ZoneInfo("Asia/Bangkok"))
                 current_date = now.date()
                 name = parts[1].strip()
                 next_time_str = parts[4].strip()
                 period_str = parts[5].strip()
-                if len(parts) > 6 and parts[6].strip():
-                    occ = parts[6].strip()
-                else:
-                    occ = "-"
+                occ = parts[6].strip() if len(parts) > 6 and parts[6].strip() else "-"
 
                 # แปลง next_spawn เป็น time
                 try:
@@ -110,15 +107,12 @@ async def on_message(message):
                         print(f"❌ ข้าม {name} เนื่องจากรูปแบบเวลาไม่ถูกต้อง: {e}")
                         continue
 
-                # ข้ามวันถ้าตัวถัดไปมีเวลาน้อยกว่าตัวก่อน
-                now_str = now.strftime("%H:%M")
-                spawn_time_str = spawn_time_obj.strftime("%H:%M")
-                if now_str > spawn_time_str:
+                # ✅ ใช้เวลาเปรียบกันจริง ๆ
+                if now.time() > spawn_time_obj:
                     current_date += timedelta(days=1)
 
-                # สร้าง datetime แบบไม่มีวินาที
                 spawn_datetime = datetime.combine(current_date, spawn_time_obj).replace(tzinfo=ZoneInfo("Asia/Bangkok"))
-                spawn_str = spawn_datetime.strftime("%Y-%m-%d %H:%M")  # ✅ ไม่เอาวินาที
+                spawn_str = spawn_datetime.strftime("%Y-%m-%d %H:%M")
 
                 # ตรวจสอบว่ามีอยู่หรือยัง
                 cursor = await db.execute("SELECT 1 FROM bosses WHERE name = ?", (name,))
@@ -140,7 +134,9 @@ async def on_message(message):
             await db.commit()
 
         await message.channel.send(f"✅ เพิ่มใหม่ {inserted} รายการ, อัปเดต {updated} รายการเรียบร้อยแล้ว")
-    await bot.process_commands(message)  # ให้คำสั่งอื่นยังใช้งานได้
+
+    await bot.process_commands(message)  # ✅ ต้องอยู่นอก if
+
 
 
 # ---------- ADD BOSS ----------
