@@ -90,7 +90,8 @@ async def on_message(message: discord.Message):
 
         inserted, updated = 0, 0
         current_date = datetime.now(tz).date()
-        last_time = None  # เก็บเวลาแถวก่อนหน้า เพื่อตรวจข้ามวัน
+        now = datetime.now(ZoneInfo("Asia/Bangkok"))
+        #last_time = None  # เก็บเวลาแถวก่อนหน้า เพื่อตรวจข้ามวัน
 
         async with aiosqlite.connect(DB_PATH) as db:
             for line in lines:
@@ -124,9 +125,9 @@ async def on_message(message: discord.Message):
                 # ตรรกะข้ามวันตามลำดับไฟล์นำเข้า:
                 # แถวแรก = วันนี้, แถวถัดไป ถ้าเวลาน้อยกว่า (หรือเท่ากับ) เวลาแถวก่อนหน้า → +1 วัน
                 #if last_time is not None and spawn_time_obj <= last_time:
-                if current_date >= spawn_time_obj:
+                if spawn_time_obj <= now.time():
                     current_date += timedelta(days=1)
-                last_time = spawn_time_obj
+                #last_time = spawn_time_obj
 
                 # รวมวัน+เวลา (ไม่มีวินาทีตามที่ต้องการ)
                 spawn_dt = datetime.combine(current_date, spawn_time_obj).replace(tzinfo=tz)
