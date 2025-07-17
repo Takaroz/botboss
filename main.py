@@ -40,7 +40,8 @@ async def init_db():
         await db.execute("""
             CREATE TABLE IF NOT EXISTS bosses (
                 no INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
+                name TEXT NOT NULL,         -- name_en
+                name_th TEXT DEFAULT '-',   -- เพิ่มตรงนี้
                 period TEXT NOT NULL,
                 next_spawn TEXT,
                 locate TEXT DEFAULT '-',
@@ -103,7 +104,7 @@ async def on_message(message: discord.Message):
                 # mapping field (ปรับตามรูปแบบจริงของคุณ)
                 # parts: 0=no, 1=name, 2=locate, 3=ignored?, 4=next_time, 5=period, 6=occ(optional)
                 name = parts[1]
-                locate = parts[2] if parts[2] else "-"
+                name_th = parts[2].strip()
                 next_time_str = parts[4]
                 period_str = parts[5]
                 occ = parts[6] if len(parts) > 6 and parts[6] else "-"
@@ -136,14 +137,14 @@ async def on_message(message: discord.Message):
 
                 if exists:
                     await db.execute(
-                        "UPDATE bosses SET next_spawn = ?, period = ?, locate = ?, occ = ? WHERE name = ?",
-                        (spawn_str, period_str, locate, occ, name)
+                        "UPDATE bosses SET next_spawn = ?, period = ?, occ = ?, name_th = ? WHERE name = ?",
+                        (spawn_str, period_str, occ, name_th, name_en)
                     )
                     updated += 1
                 else:
                     await db.execute(
-                        "INSERT INTO bosses (name, next_spawn, period, locate, occ) VALUES (?, ?, ?, ?, ?)",
-                        (name, spawn_str, period_str, locate, occ)
+                        "INSERT INTO bosses (name, name_th, next_spawn, period, occ) VALUES (?, ?, ?, ?, ?)",
+                        (name_en, name_th, spawn_str, period_str, occ)
                     )
                     inserted += 1
 
