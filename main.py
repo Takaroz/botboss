@@ -89,7 +89,6 @@ async def on_message(message: discord.Message):
         lines = [ln for ln in lines_raw if ln.strip()]
 
         inserted, updated = 0, 0
-        current_date = datetime.now(tz).date()
         now = datetime.now(ZoneInfo("Asia/Bangkok"))
         #last_time = None  # เก็บเวลาแถวก่อนหน้า เพื่อตรวจข้ามวัน
 
@@ -104,6 +103,7 @@ async def on_message(message: discord.Message):
 
                 # mapping field (ปรับตามรูปแบบจริงของคุณ)
                 # parts: 0=no, 1=name, 2=locate, 3=ignored?, 4=next_time, 5=period, 6=occ(optional)
+                current_date = datetime.now(tz).date()
                 name = parts[1]
                 name_th = parts[2].strip()
                 next_time_str = parts[4]
