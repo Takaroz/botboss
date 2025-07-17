@@ -125,7 +125,8 @@ async def on_message(message: discord.Message):
                 # ตรรกะข้ามวันตามลำดับไฟล์นำเข้า:
                 # แถวแรก = วันนี้, แถวถัดไป ถ้าเวลาน้อยกว่า (หรือเท่ากับ) เวลาแถวก่อนหน้า → +1 วัน
                 #if last_time is not None and spawn_time_obj <= last_time:
-                if spawn_time_obj <= now.time():
+                if now.time() >= spawn_time_obj:
+                    print(f" {now.time()} >= {spawn_time_obj}")
                     current_date += timedelta(days=1)
                 #last_time = spawn_time_obj
 
