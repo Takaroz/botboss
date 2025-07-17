@@ -86,8 +86,8 @@ async def on_message(message):
         async with (aiosqlite.connect(DB_PATH) as db):
             for line in lines:
                 parts = line.strip().split(",")
-                if len(parts) < 6:
-                    continue
+                #if len(parts) < 6:
+                #   continue
 
                 now = datetime.now(ZoneInfo("Asia/Bangkok"))
                 current_date = now.date()
