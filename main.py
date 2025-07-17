@@ -138,13 +138,13 @@ async def on_message(message: discord.Message):
                 if exists:
                     await db.execute(
                         "UPDATE bosses SET next_spawn = ?, period = ?, occ = ?, name_th = ? WHERE name = ?",
-                        (spawn_str, period_str, occ, name_th, name_en)
+                        (spawn_str, period_str, occ, name_th, name)
                     )
                     updated += 1
                 else:
                     await db.execute(
                         "INSERT INTO bosses (name, name_th, next_spawn, period, occ) VALUES (?, ?, ?, ?, ?)",
-                        (name_en, name_th, spawn_str, period_str, occ)
+                        (name, name_th, spawn_str, period_str, occ)
                     )
                     inserted += 1
 
