@@ -330,15 +330,15 @@ async def check_spawn_notifications():
         return
     now = datetime.now(ZoneInfo("Asia/Bangkok"))
     async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("SELECT name, locate, next_spawn, occ FROM bosses WHERE next_spawn IS NOT NULL") as cursor:
+        async with db.execute("SELECT name, name_th, locate, next_spawn, occ FROM bosses WHERE next_spawn IS NOT NULL") as cursor:
             rows = await cursor.fetchall()
-    for name, locate, next_spawn_str, occ in rows:
+    for name, name_th, locate, next_spawn_str, occ in rows:
         try:
             next_spawn_time = datetime.strptime(next_spawn_str, "%Y-%m-%d %H:%M").replace(tzinfo=ZoneInfo("Asia/Bangkok"))
             diff = (next_spawn_time - now).total_seconds()
             if (240 < diff <= 300) or (0 < diff <= 120):
                 now_str = now.strftime("%H:%M")
-                await channel.send(f"⏰ {occ} ({now_str}) ใกล้ถึงเวลาเกิดของ **{name}** (อยู่ {locate}) แล้ว! อีก {int(diff // 60) + 1} นาที({next_spawn_time.strftime('%H:%M')})")
+                await channel.send(f"⏰ {occ} ({now_str}) ใกล้ถึงเวลาเกิดของ **{name_th}({name})** (อยู่ {locate}) แล้ว! อีก {int(diff // 60) + 1} นาที({next_spawn_time.strftime('%H:%M')})")
         except Exception as e:
             print(f"❌ Error parsing spawn time: {e}")
 
