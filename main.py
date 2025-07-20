@@ -94,7 +94,7 @@ async def on_message(message: discord.Message):
 
         async with aiosqlite.connect(DB_PATH) as db:
             for line in lines:
-                parts = [p.strip() for p in line.split(",")]
+                parts = [p.strip() for p in line.split("    ")]
 
                 # ต้องมีอย่างน้อย 6 คอลัมน์: no, name, locate, ???, next_time, period, [occ]
                 if len(parts) < 6:
