@@ -82,7 +82,7 @@ async def on_message(message: discord.Message):
         return
 
     content = message.content.strip()  # ตัดช่องว่าง/บรรทัดนำท้าย
-    if content.lower().startswith("!boss"):
+    if content.lower().startswith("!importbosses"):
         tz = ZoneInfo("Asia/Bangkok")
         lines_raw = content.splitlines()[1:]  # ตัดบรรทัดคำสั่ง
         # กรองบรรทัดว่าง
