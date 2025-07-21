@@ -17,8 +17,8 @@ CHANNEL_ID = 1375815326658461736  # <-- เปลี่ยนเป็น channe
 
 # ---------- BOT SETUP ----------
 intents = discord.Intents.default()
-bot = commands.Bot(command_prefix="!", intents=intents)
 intents.message_content = True
+bot = commands.Bot(command_prefix="!", intents=intents)
 #bot = commands.Bot(command_prefix="/", intents=intents)
 
 # ---------- AUTOCOMPLETE ----------
