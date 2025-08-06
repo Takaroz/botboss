@@ -14,6 +14,7 @@ from myServer import server_on
 TOKEN = os.getenv('TOKEN')  # <-- ใส่ Token จริงที่นี่
 DB_PATH = "bosses.db"
 CHANNEL_ID = 1375815326658461736  # <-- เปลี่ยนเป็น channel id ที่จะใช้แจ้งเตือน
+MAX_LEN = 1800
 
 # ---------- BOT SETUP ----------
 intents = discord.Intents.default()
@@ -172,7 +173,7 @@ async def addboss(interaction: discord.Interaction, name: str, period: str, occ:
         await interaction.response.send_message("❌ รูปแบบเวลาไม่ถูกต้อง (ต้องเป็น HH:MM)", ephemeral=True)
         return
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("INSERT INTO bosses (name, period, occ) VALUES (?, ?, ?, ?)", (name, period, occ))
+        await db.execute("INSERT INTO bosses (name, period, occ) VALUES (?, ?, ?)", (name, period, occ))
         await db.commit()
     await interaction.response.send_message(f"✅ เพิ่มบอส {name} แล้ว")
 
@@ -353,6 +354,7 @@ async def main():
     await bot.start(TOKEN)
 
 asyncio.run(main())
+
 
 
 
