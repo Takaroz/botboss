@@ -108,9 +108,9 @@ async def on_message(message: discord.Message):
                 current_date = datetime.now(tz).date()
                 name = parts[1]
                 #name_th = parts[2].strip()
-                next_time_str = parts[4]
-                period_str = parts[5]
-                occ = parts[6] if len(parts) > 6 and parts[6] else "-"
+                next_time_str = parts[3]
+                period_str = parts[4]
+                occ = parts[5] if len(parts) > 5 and parts[5] else "-"
 
                 # parse เวลาฟื้น
                 spawn_time_obj = None
@@ -356,5 +356,6 @@ async def main():
     await bot.start(TOKEN)
 
 asyncio.run(main())
+
 
 
