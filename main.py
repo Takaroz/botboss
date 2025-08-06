@@ -163,12 +163,12 @@ async def addboss(interaction: discord.Interaction, name: str, period: str, occ:
 @bot.tree.command(name="listboss", description="แสดงรายชื่อบอสทั้งหมด")
 async def listboss(interaction: discord.Interaction):
     async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("SELECT no, name, period, next_spawn, occ FROM bosses ORDER BY no ASC") as cursor:
+        async with db.execute("SELECT no, name, period, next_spawn, occ FROM bosses ORDER BY next_spawn ASC") as cursor:
             rows = await cursor.fetchall()
     if not rows:
         await interaction.response.send_message("⚠️ ยังไม่มีข้อมูลบอสในระบบ")
         return
-    msg = "**📋 รายชื่อบอสทั้งหมด:**\n"
+    message = "**📋 รายชื่อบอสทั้งหมด:**\n"
     for row in rows:
         line = f"NO.{no}\t {name}\t ({period})\t {next_spawn}\t {occ}\n"
         if len(message + line) > MAX_LEN:
@@ -342,6 +342,7 @@ async def main():
     await bot.start(TOKEN)
 
 asyncio.run(main())
+
 
 
 
