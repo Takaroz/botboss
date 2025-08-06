@@ -98,8 +98,8 @@ async def on_message(message: discord.Message):
                 #parts = [p.strip() for p in line.replace("\t", " ").split() if p.strip()]
                 parts = re.split(r"\s{2,}|\t", line.strip())
 
-                # ต้องมีอย่างน้อย 6 คอลัมน์: no, name, locate, ???, next_time, period, [occ]
-                if len(parts) < 7:
+                # ต้องมีอย่างน้อย 5 คอลัมน์: no, name, locate, ???, next_time, period, [occ]
+                if len(parts) < 6:
                     print(f"⚠️ บรรทัดขาดคอลัมน์: {line!r}")
                     continue
 
@@ -356,4 +356,5 @@ async def main():
     await bot.start(TOKEN)
 
 asyncio.run(main())
+
 
