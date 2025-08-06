@@ -24,10 +24,17 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 # ---------- AUTOCOMPLETE ----------
 async def boss_name_autocomplete(interaction: discord.Interaction, current: str):
-    async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute("SELECT name FROM bosses WHERE name LIKE ?", (f"%{current}%",))
-        names = [row[0] for row in await cursor.fetchall()]
-    return [app_commands.Choice(name=name, value=name) for name in names]
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute(
+                "SELECT name FROM bosses WHERE name LIKE ? ORDER BY name ASC LIMIT 25",
+                (f"%{current}%",)
+            )
+            names = [row[0] for row in await cursor.fetchall()]
+        return [app_commands.Choice(name=name, value=name) for name in names]
+    except Exception as e:
+        print(f"[autocomplete error] {e}")
+        return []
 
 # ---------- ON READY ----------
 @bot.event
@@ -262,7 +269,7 @@ async def incoming(interaction: discord.Interaction):
     now = datetime.now() + timedelta(hours=7)  # ปรับเวลาประเทศไทย
 
     async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute("SELECT name, next_spawn, occ FROM bosses WHERE next_spawn IS NOT NULL LIMIT 20")
+        cursor = await db.execute("SELECT name, next_spawn, occ FROM bosses WHERE next_spawn IS NOT NULL ORDER BY next_spawn ASC LIMIT 20")
         rows = await cursor.fetchall()
 
     upcoming = []
@@ -335,6 +342,7 @@ async def main():
     await bot.start(TOKEN)
 
 asyncio.run(main())
+
 
 
 
