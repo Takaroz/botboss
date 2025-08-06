@@ -165,7 +165,7 @@ async def listboss(interaction: discord.Interaction):
     await interaction.response.defer()  # เผื่อข้อมูลเยอะ
 
     async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("SELECT no, name, period, next_spawn, occ FROM bosses ORDER BY next_spawn ASC") as cursor:
+        async with db.execute("SELECT no, name, period, next_spawn, occ FROM bosses ORDER BY no ASC") as cursor:
             rows = await cursor.fetchall()
 
     if not rows:
@@ -273,7 +273,7 @@ async def incoming(interaction: discord.Interaction):
     now = datetime.now() + timedelta(hours=7)  # ปรับเวลาประเทศไทย
 
     async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute("SELECT name, next_spawn, occ FROM bosses WHERE next_spawn IS NOT NULL ORDER BY no ASC LIMIT 20")
+        cursor = await db.execute("SELECT name, next_spawn, occ FROM bosses WHERE next_spawn IS NOT NULL ORDER BY next_spawn ASC LIMIT 20")
         rows = await cursor.fetchall()
 
     upcoming = []
@@ -346,6 +346,7 @@ async def main():
     await bot.start(TOKEN)
 
 asyncio.run(main())
+
 
 
 
