@@ -273,7 +273,7 @@ async def incoming(interaction: discord.Interaction):
     now = datetime.now() + timedelta(hours=7)  # ปรับเวลาประเทศไทย
 
     async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute("SELECT name, next_spawn, occ FROM bosses WHERE next_spawn IS NOT NULL ORDER BY next_spawn ASC LIMIT 20")
+        cursor = await db.execute("SELECT name, next_spawn, occ FROM bosses WHERE next_spawn IS NOT NULL ORDER BY no ASC LIMIT 20")
         rows = await cursor.fetchall()
 
     upcoming = []
@@ -346,6 +346,7 @@ async def main():
     await bot.start(TOKEN)
 
 asyncio.run(main())
+
 
 
 
