@@ -48,31 +48,6 @@ async def init_db():
                 occ TEXT DEFAULT '-'
             )
         """)
-        # await db.executemany("""
-        #     INSERT INTO bosses (name, locate, period, next_spawn) VALUES (?, ?, ?, ?)
-        # """, [
-        #     ("เชอร์ทูบา", None, "06:00", "2025-05-31 14:14"),
-        #     ("เคลซอส", None, "10:00", None),
-        #     ("บาซิลา", None, "04:00", "2025-05-31 09:47"),
-        #     ("เฟลิส", None, "03:00", "2025-05-31 09:40"),
-        #     ("ทาลาคิน", None, "10:00", "2025-05-31 15:02"),
-        #     ("พันดรายด์", None, "12:00", "2025-05-31 09:31"),
-        #     ("ซาร์ก้า", None, "10:00", "2025-05-31 09:13"),
-        #     ("ทิมิทริส", None, "08:00", "2025-05-31 13:04"),
-        #     ("สตัน", None, "07:00", "2025-05-31 12:41"),
-        #     ("ครูม่ากลายพัน", None, "08:00", "2025-05-31 11:32"),
-        #     ("พันนาโรด", None, "10:00", "2025-05-31 13:19"),
-        #     ("เมดูซ่า", None, "10:00", "2025-05-31 14:38"),
-        #     ("เบรก้า", None, "06:00", "2025-05-31 14:34"),
-        #     ("มาทูรา", None, "06:00", "2025-05-31 12:18"),
-        #     ("แบล็คลิลลี่", None, "12:00", "2025-05-31 09:27"),
-        #     ("เบฮีมอธ", None, "09:00", "2025-05-31 10:50"),
-        #     ("ซาบัน", "มดชั้น2", "12:00", None),
-        #     ("ราชินีมด", "มดชั้น3", "06:00", "2025-05-31 09:24"),
-        #     ("ครูม่าปนเปื้อน", "ครูม่าชั้น 3", "08:00", "2025-05-31 15:51"),
-        #     ("คาทาน", "ครูม่าชั้น 6", "10:00", "2025-05-31 16:57"),
-        #     ("คอร์ซัส", "ครูม่าชั้น 7", "10:00", "2025-05-31 15:02"),
-        # ])
         await db.commit()
 
 @bot.event
@@ -187,9 +162,15 @@ async def listboss(interaction: discord.Interaction):
         await interaction.response.send_message("⚠️ ยังไม่มีข้อมูลบอสในระบบ")
         return
     msg = "**📋 รายชื่อบอสทั้งหมด:**\n"
-    for no, name, period, next_spawn, occ in rows:
-        msg += f"NO.{no}\t {name}\t ({period})\t {next_spawn}\t {occ}\n"
-    await interaction.response.send_message(msg)
+    for row in rows:
+        line = f"NO.{no}\t {name}\t ({period})\t {next_spawn}\t {occ}\n"
+        if len(message + line) > MAX_LEN:
+            await interaction.followup.send(message)
+            message = ""
+        message += line
+    
+    if message:
+        await interaction.followup.send(message)
 
 # ---------- DELETE BOSS ----------
 @bot.tree.command(name="deleteboss", description="ลบบอส")
@@ -281,7 +262,7 @@ async def incoming(interaction: discord.Interaction):
     now = datetime.now() + timedelta(hours=7)  # ปรับเวลาประเทศไทย
 
     async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute("SELECT name, next_spawn, occ FROM bosses WHERE next_spawn IS NOT NULL")
+        cursor = await db.execute("SELECT name, next_spawn, occ FROM bosses WHERE next_spawn IS NOT NULL LIMIT 20")
         rows = await cursor.fetchall()
 
     upcoming = []
@@ -354,6 +335,7 @@ async def main():
     await bot.start(TOKEN)
 
 asyncio.run(main())
+
 
 
 
