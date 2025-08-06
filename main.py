@@ -104,10 +104,10 @@ async def on_message(message: discord.Message):
                     continue
 
                 # mapping field (ปรับตามรูปแบบจริงของคุณ)
-                # parts: 0=no, 1=name, 2=locate, 3=ignored?, 4=next_time, 5=period, 6=occ(optional)
+                # parts: 0=no, 1=name, 2=ignored?, 3=next_time, 4=period, 5=occ
                 current_date = datetime.now(tz).date()
                 name = parts[1]
-                name_th = parts[2].strip()
+                #name_th = parts[2].strip()
                 next_time_str = parts[4]
                 period_str = parts[5]
                 occ = parts[6] if len(parts) > 6 and parts[6] else "-"
@@ -142,14 +142,14 @@ async def on_message(message: discord.Message):
 
                 if exists:
                     await db.execute(
-                        "UPDATE bosses SET next_spawn = ?, period = ?, occ = ?, name_th = ? WHERE name = ?",
-                        (spawn_str, period_str, occ, name_th, name)
+                        "UPDATE bosses SET next_spawn = ?, period = ?, occ = ? WHERE name = ?",
+                        (spawn_str, period_str, occ, name)
                     )
                     updated += 1
                 else:
                     await db.execute(
-                        "INSERT INTO bosses (name, name_th, next_spawn, period, occ) VALUES (?, ?, ?, ?, ?)",
-                        (name, name_th, spawn_str, period_str, occ)
+                        "INSERT INTO bosses (name, next_spawn, period, occ) VALUES (?, ?, ?, ?)",
+                        (name, spawn_str, period_str, occ)
                     )
                     inserted += 1
 
@@ -356,3 +356,4 @@ async def main():
     await bot.start(TOKEN)
 
 asyncio.run(main())
+
