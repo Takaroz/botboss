@@ -292,7 +292,7 @@ async def incoming(interaction: discord.Interaction):
     upcoming.sort()
     past.sort()
 
-    all_bosses = upcoming + past
+    all_bosses = upcoming
 
     if not all_bosses:
         await interaction.followup.send("❌ ยังไม่มีข้อมูลเวลาฟื้นของบอสใดๆ")
@@ -346,6 +346,7 @@ async def main():
     await bot.start(TOKEN)
 
 asyncio.run(main())
+
 
 
 
