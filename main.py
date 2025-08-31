@@ -57,6 +57,11 @@ async def init_db():
         """)
         await db.commit()
 
+@bot.tree.error
+async def on_app_command_error(interaction: discord.Interaction, error):
+    if isinstance(interaction.channel, discord.DMChannel):
+        await interaction.response.send_message("❌ ใช้คำสั่งนี้ได้เฉพาะในเซิร์ฟเวอร์", ephemeral=True)
+
 @bot.event
 async def on_message(message: discord.Message):
     # อย่าจับข้อความของบอตตัวเอง
@@ -346,6 +351,7 @@ async def main():
     await bot.start(TOKEN)
 
 asyncio.run(main())
+
 
 
 
